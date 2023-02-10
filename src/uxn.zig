@@ -60,7 +60,7 @@ pub fn HALT(c: u8, u: *Uxn, instr: u8, pc: u16) !void {
 }
 // #define JUMP(x) { if(bs) pc = (x); else pc += (Sint8)(x); }
 pub fn JUMP(x: u16, bs: u16, pc: *u16) void {
-    // TODO: revisit this
+    // TODO: revisit
     if (bs > 0) pc.* = x else pc.* = @intCast(u16, @intCast(i32, pc.*) + @intCast(i32, @bitCast(i8, @truncate(u8, x))));
 }
 // #define PUSH8(s, x) { if(s->ptr == 0xff) HALT(2) s->dat[s->ptr++] = (x); }
@@ -243,7 +243,7 @@ pub fn uxn_eval(u: *Uxn, pc_: u16) anyerror!void {
         const instr_u8 = @intCast(u8, instr);
         const sw = @intCast(i32, opcode) - (@boolToInt(opcode == 0) * (instr >> 5));
         // debug logging
-        std.debug.print("instr: {}, pc: {}, bs: {}, opcode: {}, sw: {}\n", .{ instr, pc, bs, opcode, sw });
+        // std.debug.print("instr: {}, pc: {}, bs: {}, opcode: {}, sw: {}\n", .{ instr, pc, bs, opcode, sw });
         switch (sw) {
             // ** Literals/Calls **
             // BRK
@@ -472,7 +472,7 @@ pub fn uxn_eval(u: *Uxn, pc_: u16) anyerror!void {
                 // 		case 0x1f: /* SFT */ POP8(a) POP(b) PUSH(src, b >> (a & 0x0f) << ((a & 0xf0) >> 4)) break;
             },
             // TODO: revisit
-            else => unreachable,
+            else => {},
         }
     }
 }

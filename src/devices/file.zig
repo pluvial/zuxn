@@ -347,12 +347,12 @@ pub fn file_dei(id: u8, d: [*]u8, port: u8) !u8 {
             POKDEV(0x2, res, d);
         },
         // TODO: revisit
-        else => unreachable,
+        else => {},
     }
     return d[port];
 }
 
-// /* Boot */
+// ** Boot **
 
 // int
 // load_rom(Uxn *u, char *filename)

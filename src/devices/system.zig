@@ -77,7 +77,7 @@ pub fn uxn_halt(u: *Uxn, instr: u8, err: u8, addr: u16) !void {
     }
 }
 
-// /* IO */
+// ** IO **
 
 // void
 // system_deo(Uxn *u, Uint8 *d, Uint8 port)
@@ -91,11 +91,13 @@ pub fn uxn_halt(u: *Uxn, instr: u8, err: u8, addr: u16) !void {
 // 	}
 // }
 pub fn system_deo(u: *Uxn, d: [*]u8, port: u8) void {
+    // debug logging
+    // std.debug.print("d: {*}, port: {}\n", .{ d, port });
     switch (port) {
         0x2 => u.wst = @ptrCast(*Stack, u.ram.ptr + if (d[port] > 0) @as(usize, d[port]) * 0x100 else 0x10000),
         0x3 => u.rst = @ptrCast(*Stack, u.ram.ptr + if (d[port] > 0) @as(usize, d[port]) * 0x100 else 0x10100),
         0xe => if (u.wst.ptr > 0 or u.rst.ptr > 0) system_inspect(u),
         // TODO: revisit
-        else => unreachable,
+        else => {},
     }
 }

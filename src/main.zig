@@ -151,20 +151,20 @@ fn console_deo(d: [*]u8, port: u8) void {
 fn emu_dei(u: *Uxn, addr: u8) u8 {
     const p = addr & 0x0f;
     const d = addr & 0xf0;
-    switch (d) {
-        0xa0 => return file_dei(0, u.dev + d, p) catch |err| {
+    return switch (d) {
+        0xa0 => file_dei(0, u.dev + d, p) catch |err| {
             std.debug.print("file_dei error: {s}\n", .{@errorName(err)});
+            // TODO: revisit
             return std.math.maxInt(u8);
         },
-        0xb0 => return file_dei(1, u.dev + d, p) catch |err| {
+        0xb0 => file_dei(1, u.dev + d, p) catch |err| {
             std.debug.print("file_dei error: {s}\n", .{@errorName(err)});
+            // TODO: revisit
             return std.math.maxInt(u8);
         },
-        0xc0 => return datetime_dei(u.dev + d, p),
-        // TODO: revisit
-        else => unreachable,
-    }
-    return u.dev[addr];
+        0xc0 => datetime_dei(u.dev + d, p),
+        else => u.dev[addr],
+    };
 }
 
 // static void
@@ -193,7 +193,7 @@ fn emu_deo(u: *Uxn, addr: u8, v: u8) void {
         0xa0 => file_deo(0, u.ram, u.dev + d, p),
         0xb0 => file_deo(1, u.ram, u.dev + d, p),
         // TODO: revisit
-        else => unreachable,
+        else => {},
     }
     if (p == 0x01 and (SUPPORT & mask == 0))
         std.debug.print("Warning: Incompatible emulation, device: {}.\n", .{d});
