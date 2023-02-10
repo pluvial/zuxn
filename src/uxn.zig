@@ -247,196 +247,234 @@ pub fn uxn_eval(u: *Uxn, pc_: u16) c_int {
         // Short Mode
         bs = instr & 0x20;
         opcode = instr & 0x1f;
+        const instr_u8 = @intCast(u8, instr);
         const sw = @intCast(i32, opcode) - (@boolToInt(opcode == 0) * (instr >> 5));
         // debug logging
         std.debug.print("instr: {}, pc: {}, bs: {}, opcode: {}, sw: {}\n", .{ instr, pc, bs, opcode, sw });
         switch (sw) {
-            // Literals/Calls
-            -0x0 => return 1, // BRK
-            -0x1 => { // JCI
-                if (POP8(&b, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
+            // ** Literals/Calls **
+            // BRK
+            -0x0 => return 1,
+            // JCI
+            -0x1 => {
+                if (POP8(&b, src.*, &j, u, instr_u8, pc, sp)) |err| return err;
                 if (b > 0) {
                     pc += 2;
                 }
             },
-            -0x2 => { // JMI
+            // JMI
+            -0x2 => {
                 PEEK16(&a, pc, u);
                 pc += a + 2;
             },
-            -0x3 => { // JSI
-                if (PUSH16(u.rst, pc + 2, &j, &k, u, @intCast(u8, instr), pc)) |err| return err;
+            // JSI
+            -0x3 => {
+                if (PUSH16(u.rst, pc + 2, &j, &k, u, instr_u8, pc)) |err| return err;
                 PEEK16(&a, pc, u);
                 pc += a + 2;
             },
-            -0x4, -0x6 => { // LIT, LITr
+            // LIT, LITr
+            -0x4, -0x6 => {
                 a = u.ram[pc];
                 pc += 1;
-                if (PUSH8(src, @intCast(u8, a), u, @intCast(u8, instr), pc)) |err| return err;
+                if (PUSH8(src, @intCast(u8, a), u, instr_u8, pc)) |err| return err;
             },
-            -0x5, -0x7 => { // LIT2, LIT2r
+            // LIT2, LIT2r
+            -0x5, -0x7 => {
                 PEEK16(&a, pc, u);
-                if (PUSH16(src, a, &j, &k, u, @intCast(u8, instr), pc)) |err| return err;
+                if (PUSH16(src, a, &j, &k, u, instr_u8, pc)) |err| return err;
                 pc += 2;
             },
-            // ALU
-            0x01 => { // INC
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH(src, a + 1, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            // ** ALU **
+            // INC
+            0x01 => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH(src, a + 1, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x02 => { // POP
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+            // POP
+            0x02 => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
             },
-            0x03 => { // NIP
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH(src, b, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            // NIP
+            0x03 => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH(src, b, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x04 => { // SWP
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH(src, a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
-                if (PUSH(src, b, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            // SWP
+            0x04 => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH(src, a, &j, &k, u, instr_u8, pc, bs)) |err| return err;
+                if (PUSH(src, b, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x05 => { // ROT
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&c, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH(src, b, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
-                if (PUSH(src, a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
-                if (PUSH(src, c, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            // ROT
+            0x05 => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&c, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH(src, b, &j, &k, u, instr_u8, pc, bs)) |err| return err;
+                if (PUSH(src, a, &j, &k, u, instr_u8, pc, bs)) |err| return err;
+                if (PUSH(src, c, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x06 => { // DUP
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH(src, a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
-                if (PUSH(src, a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            // DUP
+            0x06 => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH(src, a, &j, &k, u, instr_u8, pc, bs)) |err| return err;
+                if (PUSH(src, a, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x07 => { // OVR
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH(src, b, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
-                if (PUSH(src, a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
-                if (PUSH(src, b, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            // OVR
+            0x07 => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH(src, b, &j, &k, u, instr_u8, pc, bs)) |err| return err;
+                if (PUSH(src, a, &j, &k, u, instr_u8, pc, bs)) |err| return err;
+                if (PUSH(src, b, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x08 => { // EQU
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH8(src, @boolToInt(b == a), u, @intCast(u8, instr), pc)) |err| return err;
+            // EQU
+            0x08 => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH8(src, @boolToInt(b == a), u, instr_u8, pc)) |err| return err;
             },
-            0x09 => { // NEQ
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH8(src, @boolToInt(b != a), u, @intCast(u8, instr), pc)) |err| return err;
+            // NEQ
+            0x09 => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH8(src, @boolToInt(b != a), u, instr_u8, pc)) |err| return err;
             },
-            0x0a => { // GTH
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH8(src, @boolToInt(b > a), u, @intCast(u8, instr), pc)) |err| return err;
+            // GTH
+            0x0a => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH8(src, @boolToInt(b > a), u, instr_u8, pc)) |err| return err;
             },
-            0x0b => { // LTH
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH8(src, @boolToInt(b < a), u, @intCast(u8, instr), pc)) |err| return err;
+            // LTH
+            0x0b => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH8(src, @boolToInt(b < a), u, instr_u8, pc)) |err| return err;
             },
-            0x0c => { // JMP
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+            // JMP
+            0x0c => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
                 JUMP(a, bs, &pc);
             },
-            0x0d => { // JCN
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+            // JCN
+            0x0d => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
                 if (b != 0)
                     JUMP(a, bs, &pc);
             },
-            0x0e => { // JSR
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH16(dst, pc, &j, &k, u, @intCast(u8, instr), pc)) |err| return err;
+            // JSR
+            0x0e => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH16(dst, pc, &j, &k, u, instr_u8, pc)) |err| return err;
                 JUMP(a, bs, &pc);
             },
-            0x0f => { // STH
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH(dst, a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            // STH
+            0x0f => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH(dst, a, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x10 => { // LDZ
-                if (POP8(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
+            // LDZ
+            0x10 => {
+                if (POP8(&a, src.*, &j, u, instr_u8, pc, sp)) |err| return err;
                 PEEK(&b, a, u, bs);
-                if (PUSH(src, b, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+                if (PUSH(src, b, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x11 => { // STZ
-                if (POP8(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+            // STZ
+            0x11 => {
+                if (POP8(&a, src.*, &j, u, instr_u8, pc, sp)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
                 POKE(a, b, u, bs);
             },
-            0x12 => { // LDR
-                if (POP8(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
+            // LDR
+            0x12 => {
+                if (POP8(&a, src.*, &j, u, instr_u8, pc, sp)) |err| return err;
                 b = pc + @intCast(u16, @intCast(i8, a));
                 PEEK(&c, b, u, bs);
-                if (PUSH(src, c, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+                if (PUSH(src, c, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x13 => { // STR
-                if (POP8(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+            // STR
+            0x13 => {
+                if (POP8(&a, src.*, &j, u, instr_u8, pc, sp)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
                 c = pc + @intCast(u16, @intCast(i8, a));
                 POKE(c, b, u, bs);
             },
-            0x14 => { // LDA
-                if (POP16(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
+            // LDA
+            0x14 => {
+                if (POP16(&a, src.*, &j, u, instr_u8, pc, sp)) |err| return err;
                 PEEK(&b, a, u, bs);
-                if (PUSH(src, b, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+                if (PUSH(src, b, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x15 => { // STA
-                if (POP16(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+            // STA
+            0x15 => {
+                if (POP16(&a, src.*, &j, u, instr_u8, pc, sp)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
                 POKE(a, b, u, bs);
             },
-            0x16 => { // DEI
-                if (POP8(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
+            // DEI
+            0x16 => {
+                if (POP8(&a, src.*, &j, u, instr_u8, pc, sp)) |err| return err;
                 DEVR(&b, @intCast(u8, a), u, bs);
-                if (PUSH(src, b, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+                if (PUSH(src, b, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x17 => { // DEO
-                if (POP8(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+            // DEO
+            0x17 => {
+                if (POP8(&a, src.*, &j, u, instr_u8, pc, sp)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
                 DEVW(@intCast(u8, a), b, u, bs);
             },
-            0x18 => { // ADD
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH(src, b + a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            // ADD
+            0x18 => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH(src, b + a, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x19 => { // SUB
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH(src, b - a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            // SUB
+            0x19 => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH(src, b - a, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x1a => { // MUL
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH(src, @intCast(u16, @as(u32, b) * a), &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            // MUL
+            0x1a => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH(src, @intCast(u16, @as(u32, b) * a), &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x1b => { // DIV
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (a == 0) return HALT(3, u, @intCast(u8, instr), pc);
-                if (PUSH(src, b / a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            // DIV
+            0x1b => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (a == 0) return HALT(3, u, instr_u8, pc);
+                if (PUSH(src, b / a, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x1c => { // AND
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH(src, b & a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            // AND
+            0x1c => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH(src, b & a, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x1d => { // ORA
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH(src, b | a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            // ORA
+            0x1d => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH(src, b | a, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x1e => { // EOR
-                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
-                if (PUSH(src, b ^ a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            // EOR
+            0x1e => {
+                if (POP(&a, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
+                if (PUSH(src, b ^ a, &j, &k, u, instr_u8, pc, bs)) |err| return err;
             },
-            0x1f => { // SFT
-                if (POP8(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
-                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+            // SFT
+            0x1f => {
+                if (POP8(&a, src.*, &j, u, instr_u8, pc, sp)) |err| return err;
+                if (POP(&b, src.*, &j, u, instr_u8, pc, sp, bs)) |err| return err;
                 if (PUSH(src, b >> @intCast(u4, (a & 0x0f)) << @intCast(u4, ((a & 0xf0) >> 4)), &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
                 // 		case 0x1f: /* SFT */ POP8(a) POP(b) PUSH(src, b >> (a & 0x0f) << ((a & 0xf0) >> 4)) break;
             },
