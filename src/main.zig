@@ -68,8 +68,8 @@ pub fn main() !void {
     var u: Uxn = undefined;
     uxn_boot(&u, ram, emu_dei, emu_deo) catch return emu_error("Boot", "Failed");
 
-    _ = load_rom(&u, args_list.items[1]) catch return emu_error("Load", "Failed");
-    _ = uxn_eval(&u, PAGE_PROGRAM) catch return emu_error("Init", "Failed");
+    if (try load_rom(&u, args_list.items[1]) == 0) return emu_error("Load", "Failed");
+    if (uxn_eval(&u, PAGE_PROGRAM) == 0) return emu_error("Init", "Failed");
 
     // for(i = 2; i < argc; i++) {
     // 	char *p = argv[i];

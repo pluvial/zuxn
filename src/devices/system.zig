@@ -10,7 +10,7 @@ const uxn_eval = uxn.uxn_eval;
 // 	"underflow",
 // 	"overflow",
 // 	"division by zero"};
-const errors = .{ "underflow", "overflow", "division by zero" };
+const errors = [_][]const u8{ "underflow", "overflow", "division by zero" };
 
 // static void
 // system_print(Stack *s, char *name)
@@ -62,18 +62,18 @@ fn system_inspect(u: *Uxn) void {
 // 	return 0;
 // }
 pub fn uxn_halt(u: *Uxn, instr: u8, err: u8, addr: u16) c_int {
-    const d = &u.dev[0x00];
+    const d = u.dev + 0x00;
     const handler = GETVEC(d);
-    if (handler) {
+    if (handler > 0) {
         u.wst.ptr = 4;
-        u.wst.dat[0] = addr >> 0x8;
-        u.wst.dat[1] = addr & 0xff;
+        u.wst.dat[0] = @intCast(u8, addr >> 0x8);
+        u.wst.dat[1] = @intCast(u8, addr & 0xff);
         u.wst.dat[2] = instr;
         u.wst.dat[3] = err;
         return uxn_eval(u, handler);
     } else {
         system_inspect(u);
-        std.debug.print("{s} {s}, by {} at {}.\n", .{ if (instr & 0x40) "Return-stack" else "Working-stack", errors[err - 1], instr, addr });
+        std.debug.print("{s} {s}, by {} at {}.\n", .{ if (instr & 0x40 > 0) "Return-stack" else "Working-stack", errors[err - 1], instr, addr });
     }
     return 0;
 }

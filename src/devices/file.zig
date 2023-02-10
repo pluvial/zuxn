@@ -24,7 +24,8 @@ const DEV_FILE0 = 0xa;
 const UxnFile = struct {
     f: ?std.fs.File,
     dir: ?std.fs.Dir,
-    current_filename: [4096]u8,
+    buffer_filename: [4096]u8,
+    current_filename: []u8,
     de: ?std.fs.IterableDir.Entry,
     state: enum {
         IDLE,
@@ -194,9 +195,10 @@ fn file_check_sandbox(c: *UxnFile) void {
 // 	c->current_filename[0] = '\0';
 // 	return 0;
 // }
-fn file_init(c: *UxnFile, filename: []const u8, max_len: usize, override_sandbox: bool) void {
+fn file_init(c: *UxnFile, filename: []const u8, override_sandbox: bool) void {
     reset(c);
-    std.mem.copy(u8, &c.current_filename, filename[0..max_len]);
+    c.current_filename = c.buffer_filename[0..filename.len];
+    std.mem.copy(u8, c.current_filename, filename);
     if (!override_sandbox)
         file_check_sandbox(c);
 }
@@ -222,11 +224,12 @@ fn file_read(c: *UxnFile, dest: []u8, len: u16) !u16 {
     if (c.outside_sandbox) return 0;
     if (c.state != .FILE_READ and c.state != .DIR_READ) {
         reset(c);
-        c.dir = std.fs.cwd().openDir(&c.current_filename, .{}) catch null;
+        std.debug.print("current_filename: {s}\n", .{c.current_filename});
+        c.dir = std.fs.cwd().openDir(c.current_filename, .{}) catch null;
         if (c.dir != null)
             c.state = .DIR_READ
         else {
-            c.f = std.fs.cwd().openFile(&c.current_filename, .{}) catch null;
+            c.f = std.fs.cwd().openFile(c.current_filename, .{}) catch null;
             if (c.f != null)
                 c.state = .FILE_READ;
         }
@@ -362,7 +365,7 @@ pub fn file_dei(id: u8, d: [*]u8, port: u8) !u8 {
 // 	return ret;
 // }
 pub fn load_rom(u: *Uxn, filename: []const u8) !u16 {
-    file_init(&uxn_file[0], filename, filename.len, true);
+    file_init(&uxn_file[0], filename, true);
     const ret = try file_read(&uxn_file[0], u.ram[PAGE_PROGRAM..0x10000], 0x10000 - PAGE_PROGRAM);
     reset(&uxn_file[0]);
     return ret;

@@ -10,8 +10,8 @@ const std = @import("std");
 pub const PAGE_PROGRAM = 0x0100;
 
 // #define GETVEC(d) ((d)[0] << 8 | (d)[1])
-pub fn GETVEC(d: []u8) u16 {
-    return d[0] << 8 | d[1];
+pub fn GETVEC(d: [*]u8) u16 {
+    return @as(u16, d[0]) << 8 | d[1];
 }
 // #define POKDEV(x, y) { d[(x)] = (y) >> 8; d[(x) + 1] = (y); }
 pub fn POKDEV(x: u8, y: u16, d: [*]u8) void {
@@ -209,7 +209,7 @@ pub fn DEVW(x: u16, y: u16, u: *Uxn, bs: u16) void {
 // 		}
 // 	}
 // }
-pub fn uxn_eval(u: *Uxn, _pc: u16) !c_int {
+pub fn uxn_eval(u: *Uxn, _pc: u16) c_int {
     var pc = _pc;
     var kptr: u8 = undefined;
     var sp: *u8 = undefined;
