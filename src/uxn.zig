@@ -19,8 +19,8 @@ pub fn POKDEV(x: u8, y: u16, d: [*]u8) void {
     d[x + 1] = @intCast(u8, y);
 }
 // #define PEKDEV(o, x) { (o) = (d[(x)] << 8) + d[(x) + 1]; }
-pub fn PEKDEV(o: *u16, x: u8, d: []u8) void {
-    o.* = d[x] << 8 + d[x + 1];
+pub fn PEKDEV(o: *u16, x: u8, d: [*]u8) void {
+    o.* = (@intCast(u16, d[x]) << 8) + d[x + 1];
 }
 
 // typedef struct {
