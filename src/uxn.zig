@@ -117,10 +117,10 @@ pub fn POP(o: *u16, src: Stack, j: *u16, u: *Uxn, instr: u8, pc: u16, sp: *u8, b
 // #define POKE(x, y) { if(bs) { u->ram[(x)] = (y) >> 8; u->ram[(x) + 1] = (y); } else { u->ram[(x)] = y; } }
 pub fn POKE(x: u16, y: u16, u: *Uxn, bs: u16) void {
     if (bs > 0) {
-        u.ram[x] = y >> 8;
-        u.ram[x + 1] = y;
+        u.ram[x] = @intCast(u8, y >> 8);
+        u.ram[x + 1] = @intCast(u8, y);
     } else {
-        u.ram[x] = y;
+        u.ram[x] = @intCast(u8, y);
     }
 }
 // #define PEEK16(o, x) { o = (u->ram[(x)] << 8) + u->ram[(x) + 1]; }
@@ -130,7 +130,7 @@ pub fn PEEK16(o: *u16, x: u16, u: *Uxn) void {
 // #define PEEK(o, x) { if(bs) PEEK16(o, x) else o = u->ram[(x)]; }
 pub fn PEEK(o: *u16, x: u16, u: *Uxn, bs: u16) void {
     if (bs > 0)
-        PEEK16(o, x, u, bs)
+        PEEK16(o, x, u)
     else
         o.* = u.ram[x];
 }
@@ -356,13 +356,30 @@ pub fn uxn_eval(u: *Uxn, pc_: u16) c_int {
                 if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
                 if (PUSH(dst, a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
             },
+            0x10 => { // LDZ
+                if (POP8(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
+                PEEK(&b, a, u, bs);
+                if (PUSH(src, b, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x11 => { // STZ
+                if (POP8(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                POKE(a, b, u, bs);
+            },
+            0x12 => { // LDR
+                if (POP8(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
+                b = pc + @intCast(u16, @intCast(i8, a));
+                PEEK(&c, b, u, bs);
+                if (PUSH(src, c, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x13 => { // STR
+                if (POP8(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                c = pc + @intCast(u16, @intCast(i8, a));
+                POKE(c, b, u, bs);
+            },
             // TODO: revisit
             else => unreachable,
-            // 		case 0x0f: /* STH */ POP(a) PUSH(dst, a) break;
-            // 		case 0x10: /* LDZ */ POP8(a) PEEK(b, a) PUSH(src, b) break;
-            // 		case 0x11: /* STZ */ POP8(a) POP(b) POKE(a, b) break;
-            // 		case 0x12: /* LDR */ POP8(a) b = pc + (Sint8)a; PEEK(c, b) PUSH(src, c) break;
-            // 		case 0x13: /* STR */ POP8(a) POP(b) c = pc + (Sint8)a; POKE(c, b) break;
             // 		case 0x14: /* LDA */ POP16(a) PEEK(b, a) PUSH(src, b) break;
             // 		case 0x15: /* STA */ POP16(a) POP(b) POKE(a, b) break;
             // 		case 0x16: /* DEI */ POP8(a) DEVR(b, a) PUSH(src, b) break;
