@@ -224,7 +224,6 @@ fn file_read(c: *UxnFile, dest: []u8, len: u16) !u16 {
     if (c.outside_sandbox) return 0;
     if (c.state != .FILE_READ and c.state != .DIR_READ) {
         reset(c);
-        std.debug.print("current_filename: {s}\n", .{c.current_filename});
         c.dir = std.fs.cwd().openDir(c.current_filename, .{}) catch null;
         if (c.dir != null)
             c.state = .DIR_READ

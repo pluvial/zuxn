@@ -56,31 +56,37 @@ pub fn main() !void {
     while (args_it.next()) |arg| {
         try args_list.append(arg);
     }
+    const argv = args_list.items;
+    const argc = args_list.items.len;
+
     // debug logging;
-    for (args_list.items) |arg| {
+    for (argv) |arg| {
         std.debug.print("{s} ", .{arg});
     }
     std.debug.print("\n", .{});
 
-    if (args_list.items.len < 2) return emu_error("Usage", "zuxn game.rom args");
+    if (argc < 2) return emu_error("Usage", "zuxn game.rom args");
     const ram = try allocator.alloc(u8, 0x10300);
     defer allocator.free(ram);
     var u: Uxn = undefined;
-    uxn_boot(&u, ram, emu_dei, emu_deo) catch return emu_error("Boot", "Failed");
+    uxn_boot(&u, ram, emu_dei, emu_deo);
 
-    if (try load_rom(&u, args_list.items[1]) == 0) return emu_error("Load", "Failed");
+    if (try load_rom(&u, argv[1]) == 0) return emu_error("Load", "Failed");
     if (uxn_eval(&u, PAGE_PROGRAM) == 0) return emu_error("Init", "Failed");
 
-    // for(i = 2; i < argc; i++) {
-    // 	char *p = argv[i];
-    // 	while(*p) console_input(&u, *p++);
-    // 	console_input(&u, '\n');
-    // }
-    // while(!u.dev[0x0f]) {
-    // 	int c = fgetc(stdin);
-    // 	if(c != EOF)
-    // 		console_input(&u, (Uint8)c);
-    // }
+    for (argv[2..]) |p| {
+        for (p) |c| _ = console_input(&u, c);
+        _ = console_input(&u, '\n');
+    }
+    const stdin = std.io.getStdIn().reader();
+    while (u.dev[0x0f] == 0) {
+        if (stdin.readByte()) |c|
+            _ = console_input(&u, c)
+        else |err| switch (err) {
+            error.EndOfStream => {},
+            else => return err,
+        }
+    }
 }
 
 // #define SUPPORT 0x1c03 /* devices mask */
@@ -104,7 +110,7 @@ fn emu_error(msg: []const u8, err: []const u8) void {
 // 	return uxn_eval(u, GETVEC(d));
 // }
 fn console_input(u: *Uxn, c: u8) c_int {
-    var d = &u.dev[0x10];
+    var d = u.dev + 0x10;
     d[0x02] = c;
     return uxn_eval(u, GETVEC(d));
 }

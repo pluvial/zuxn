@@ -209,8 +209,8 @@ pub fn DEVW(x: u16, y: u16, u: *Uxn, bs: u16) void {
 // 		}
 // 	}
 // }
-pub fn uxn_eval(u: *Uxn, _pc: u16) c_int {
-    var pc = _pc;
+pub fn uxn_eval(u: *Uxn, pc_: u16) c_int {
+    var pc = pc_;
     var kptr: u8 = undefined;
     var sp: *u8 = undefined;
     // var a: u16 = undefined;
@@ -313,7 +313,7 @@ pub fn uxn_eval(u: *Uxn, _pc: u16) c_int {
 // 	u->deo = deo;
 // 	return 1;
 // }
-pub fn uxn_boot(u: *Uxn, ram: []u8, dei: *const Dei, deo: *const Deo) !void {
+pub fn uxn_boot(u: *Uxn, ram: []u8, dei: *const Dei, deo: *const Deo) void {
     std.mem.set(u8, std.mem.asBytes(u), 0);
     u.wst = @ptrCast(*Stack, ram.ptr + 0x10000);
     u.rst = @ptrCast(*Stack, ram.ptr + 0x10100);
