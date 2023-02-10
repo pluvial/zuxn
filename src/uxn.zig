@@ -60,7 +60,7 @@ pub fn HALT(c: u8, u: *Uxn, instr: u8, pc: u16) c_int {
 }
 // #define JUMP(x) { if(bs) pc = (x); else pc += (Sint8)(x); }
 pub fn JUMP(x: u16, bs: u16, pc: *u16) void {
-    if (bs > 0) pc.* = x else pc.* += @intCast(i8, x);
+    if (bs > 0) pc.* = x else pc.* += @intCast(u16, @intCast(i8, x));
 }
 // #define PUSH8(s, x) { if(s->ptr == 0xff) HALT(2) s->dat[s->ptr++] = (x); }
 pub fn PUSH8(s: *Stack, x: u8, u: *Uxn, instr: u8, pc: u16) ?c_int {
@@ -322,14 +322,42 @@ pub fn uxn_eval(u: *Uxn, pc_: u16) c_int {
                 if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
                 if (PUSH8(src, @boolToInt(b == a), u, @intCast(u8, instr), pc)) |err| return err;
             },
+            0x09 => { // NEQ
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH8(src, @boolToInt(b != a), u, @intCast(u8, instr), pc)) |err| return err;
+            },
+            0x0a => { // GTH
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH8(src, @boolToInt(b > a), u, @intCast(u8, instr), pc)) |err| return err;
+            },
+            0x0b => { // LTH
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH8(src, @boolToInt(b < a), u, @intCast(u8, instr), pc)) |err| return err;
+            },
+            0x0c => { // JMP
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                JUMP(a, bs, &pc);
+            },
+            0x0d => { // JCN
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (b != 0)
+                    JUMP(a, bs, &pc);
+            },
+            0x0e => { // JSR
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH16(dst, pc, &j, &k, u, @intCast(u8, instr), pc)) |err| return err;
+                JUMP(a, bs, &pc);
+            },
+            0x0f => { // STH
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH(dst, a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
             // TODO: revisit
             else => unreachable,
-            // 		case 0x09: /* NEQ */ POP(a) POP(b) PUSH8(src, b != a) break;
-            // 		case 0x0a: /* GTH */ POP(a) POP(b) PUSH8(src, b > a) break;
-            // 		case 0x0b: /* LTH */ POP(a) POP(b) PUSH8(src, b < a) break;
-            // 		case 0x0c: /* JMP */ POP(a) JUMP(a) break;
-            // 		case 0x0d: /* JCN */ POP(a) POP8(b) if(b) JUMP(a) break;
-            // 		case 0x0e: /* JSR */ POP(a) PUSH16(dst, pc) JUMP(a) break;
             // 		case 0x0f: /* STH */ POP(a) PUSH(dst, a) break;
             // 		case 0x10: /* LDZ */ POP8(a) PEEK(b, a) PUSH(src, b) break;
             // 		case 0x11: /* STZ */ POP8(a) POP(b) POKE(a, b) break;
