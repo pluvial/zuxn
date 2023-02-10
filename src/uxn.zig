@@ -135,18 +135,18 @@ pub fn PEEK(o: *u16, x: u16, u: *Uxn, bs: u16) void {
         o.* = u.ram[x];
 }
 // #define DEVR(o, x) { o = u->dei(u, x); if (bs) o = (o << 8) + u->dei(u, (x) + 1); }
-pub fn DEVR(o: *u16, x: u16, u: *Uxn, bs: u16) void {
+pub fn DEVR(o: *u16, x: u8, u: *Uxn, bs: u16) void {
     o.* = u.dei(u, x);
     if (bs > 0)
         o.* = (o.* << 8) + u.dei(u, x + 1);
 }
 // #define DEVW(x, y) { if (bs) { u->deo(u, (x), (y) >> 8); u->deo(u, (x) + 1, (y)); } else { u->deo(u, x, (y)); } }
-pub fn DEVW(x: u16, y: u16, u: *Uxn, bs: u16) void {
+pub fn DEVW(x: u8, y: u16, u: *Uxn, bs: u16) void {
     if (bs > 0) {
-        u.deo(u, x, y >> 8);
-        u.deo(u, x + 1, y);
+        u.deo(u, x, @intCast(u8, y >> 8));
+        u.deo(u, x + 1, @intCast(u8, y));
     } else {
-        u.deo(u, x, y);
+        u.deo(u, x, @intCast(u8, y));
     }
 }
 
@@ -378,20 +378,70 @@ pub fn uxn_eval(u: *Uxn, pc_: u16) c_int {
                 c = pc + @intCast(u16, @intCast(i8, a));
                 POKE(c, b, u, bs);
             },
+            0x14 => { // LDA
+                if (POP16(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
+                PEEK(&b, a, u, bs);
+                if (PUSH(src, b, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x15 => { // STA
+                if (POP16(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                POKE(a, b, u, bs);
+            },
+            0x16 => { // DEI
+                if (POP8(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
+                DEVR(&b, @intCast(u8, a), u, bs);
+                if (PUSH(src, b, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x17 => { // DEO
+                if (POP8(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                DEVW(@intCast(u8, a), b, u, bs);
+            },
+            0x18 => { // ADD
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH(src, b + a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x19 => { // SUB
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH(src, b - a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x1a => { // MUL
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH(src, @intCast(u16, @as(u32, b) * a), &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x1b => { // DIV
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (a == 0) return HALT(3, u, @intCast(u8, instr), pc);
+                if (PUSH(src, b / a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x1c => { // AND
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH(src, b & a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x1d => { // ORA
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH(src, b | a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x1e => { // EOR
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH(src, b ^ a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x1f => { // SFT
+                if (POP8(&a, src.*, &j, u, @intCast(u8, instr), pc, sp)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH(src, b >> @intCast(u4, (a & 0x0f)) << @intCast(u4, ((a & 0xf0) >> 4)), &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+                // 		case 0x1f: /* SFT */ POP8(a) POP(b) PUSH(src, b >> (a & 0x0f) << ((a & 0xf0) >> 4)) break;
+            },
             // TODO: revisit
             else => unreachable,
-            // 		case 0x14: /* LDA */ POP16(a) PEEK(b, a) PUSH(src, b) break;
-            // 		case 0x15: /* STA */ POP16(a) POP(b) POKE(a, b) break;
-            // 		case 0x16: /* DEI */ POP8(a) DEVR(b, a) PUSH(src, b) break;
-            // 		case 0x17: /* DEO */ POP8(a) POP(b) DEVW(a, b) break;
-            // 		case 0x18: /* ADD */ POP(a) POP(b) PUSH(src, b + a) break;
-            // 		case 0x19: /* SUB */ POP(a) POP(b) PUSH(src, b - a) break;
-            // 		case 0x1a: /* MUL */ POP(a) POP(b) PUSH(src, (Uint32)b * a) break;
-            // 		case 0x1b: /* DIV */ POP(a) POP(b) if(!a) HALT(3) PUSH(src, b / a) break;
-            // 		case 0x1c: /* AND */ POP(a) POP(b) PUSH(src, b & a) break;
-            // 		case 0x1d: /* ORA */ POP(a) POP(b) PUSH(src, b | a) break;
-            // 		case 0x1e: /* EOR */ POP(a) POP(b) PUSH(src, b ^ a) break;
-            // 		case 0x1f: /* SFT */ POP8(a) POP(b) PUSH(src, b >> (a & 0x0f) << ((a & 0xf0) >> 4)) break;
         }
     }
 }
