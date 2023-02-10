@@ -82,11 +82,11 @@ pub fn PUSH16(s: *Stack, x: u16, j: *u16, k: *u16, u: *Uxn, instr: u8, pc: u16) 
     return null;
 }
 // #define PUSH(s, x) { if(bs) { PUSH16(s, (x)) } else { PUSH8(s, (x)) } }
-pub fn PUSH(s: *Stack, x: u8, j: *u16, k: *u16, u: *Uxn, instr: u8, pc: u16, bs: u16) ?c_int {
+pub fn PUSH(s: *Stack, x: u16, j: *u16, k: *u16, u: *Uxn, instr: u8, pc: u16, bs: u16) ?c_int {
     if (bs > 0)
         return PUSH16(s, x, j, k, u, instr, pc)
     else
-        return PUSH8(s, x, u, instr, pc);
+        return PUSH8(s, @intCast(u8, x), u, instr, pc);
 }
 // #define POP8(o) { if(!(j = *sp)) HALT(1) o = (Uint16)src->dat[--j]; *sp = j; }
 pub fn POP8(o: *u16, src: Stack, j: *u16, u: *Uxn, instr: u8, pc: u16, sp: *u8) ?c_int {
@@ -101,18 +101,18 @@ pub fn POP8(o: *u16, src: Stack, j: *u16, u: *Uxn, instr: u8, pc: u16, sp: *u8) 
 // #define POP16(o) { if((j = *sp) <= 1) HALT(1) o = (src->dat[j - 2] << 8) + src->dat[j - 1]; *sp = j - 2; }
 pub fn POP16(o: *u16, src: Stack, j: *u16, u: *Uxn, instr: u8, pc: u16, sp: *u8) ?c_int {
     j.* = sp.*;
-    if (j <= 1) return HALT(1, u, instr, pc);
-    o.* = (src.dat[j.* - 2] << 8) + src.dat[j.* - 1];
-    sp.* = j.* - 2;
+    if (j.* <= 1) return HALT(1, u, instr, pc);
+    o.* = (@intCast(u16, src.dat[j.* - 2]) << 8) + src.dat[j.* - 1];
+    sp.* = @intCast(u8, j.* - 2);
     // TODO: revisit
     return null;
 }
 // #define POP(o) { if(bs) { POP16(o) } else { POP8(o) } }
 pub fn POP(o: *u16, src: Stack, j: *u16, u: *Uxn, instr: u8, pc: u16, sp: *u8, bs: u16) ?c_int {
     if (bs > 0)
-        return POP16(o, src, j, u, instr, pc, sp, bs)
+        return POP16(o, src, j, u, instr, pc, sp)
     else
-        return POP8(o, src, j, u, instr, pc, sp, bs);
+        return POP8(o, src, j, u, instr, pc, sp);
 }
 // #define POKE(x, y) { if(bs) { u->ram[(x)] = (y) >> 8; u->ram[(x) + 1] = (y); } else { u->ram[(x)] = y; } }
 pub fn POKE(x: u16, y: u16, u: *Uxn, bs: u16) void {
@@ -219,7 +219,7 @@ pub fn uxn_eval(u: *Uxn, pc_: u16) c_int {
     var sp: *u8 = undefined;
     var a: u16 = undefined;
     var b: u16 = undefined;
-    // var c: u16 = undefined;
+    var c: u16 = undefined;
     var j: u16 = undefined;
     var k: u16 = undefined;
     var bs: u16 = undefined;
@@ -278,17 +278,52 @@ pub fn uxn_eval(u: *Uxn, pc_: u16) c_int {
                 if (PUSH16(src, a, &j, &k, u, @intCast(u8, instr), pc)) |err| return err;
                 pc += 2;
             },
+            // ALU
+            0x01 => { // INC
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH(src, a + 1, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x02 => { // POP
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+            },
+            0x03 => { // NIP
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH(src, b, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x04 => { // SWP
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH(src, a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+                if (PUSH(src, b, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x05 => { // ROT
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&c, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH(src, b, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+                if (PUSH(src, a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+                if (PUSH(src, c, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x06 => { // DUP
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH(src, a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+                if (PUSH(src, a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x07 => { // OVR
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH(src, b, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+                if (PUSH(src, a, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+                if (PUSH(src, b, &j, &k, u, @intCast(u8, instr), pc, bs)) |err| return err;
+            },
+            0x08 => { // EQU
+                if (POP(&a, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (POP(&b, src.*, &j, u, @intCast(u8, instr), pc, sp, bs)) |err| return err;
+                if (PUSH8(src, @boolToInt(b == a), u, @intCast(u8, instr), pc)) |err| return err;
+            },
             // TODO: revisit
             else => unreachable,
-            // 		/* ALU */
-            // 		case 0x01: /* INC */ POP(a) PUSH(src, a + 1) break;
-            // 		case 0x02: /* POP */ POP(a) break;
-            // 		case 0x03: /* NIP */ POP(a) POP(b) PUSH(src, a) break;
-            // 		case 0x04: /* SWP */ POP(a) POP(b) PUSH(src, a) PUSH(src, b) break;
-            // 		case 0x05: /* ROT */ POP(a) POP(b) POP(c) PUSH(src, b) PUSH(src, a) PUSH(src, c) break;
-            // 		case 0x06: /* DUP */ POP(a) PUSH(src, a) PUSH(src, a) break;
-            // 		case 0x07: /* OVR */ POP(a) POP(b) PUSH(src, b) PUSH(src, a) PUSH(src, b) break;
-            // 		case 0x08: /* EQU */ POP(a) POP(b) PUSH8(src, b == a) break;
             // 		case 0x09: /* NEQ */ POP(a) POP(b) PUSH8(src, b != a) break;
             // 		case 0x0a: /* GTH */ POP(a) POP(b) PUSH8(src, b > a) break;
             // 		case 0x0b: /* LTH */ POP(a) POP(b) PUSH8(src, b < a) break;
