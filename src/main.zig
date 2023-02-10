@@ -75,16 +75,16 @@ pub fn main() !void {
     uxn_boot(&u, ram, emu_dei, emu_deo);
 
     if (try load_rom(&u, argv[1]) == 0) return emu_error("Load", "Failed");
-    if (uxn_eval(&u, PAGE_PROGRAM) == 0) return emu_error("Init", "Failed");
+    uxn_eval(&u, PAGE_PROGRAM) catch return emu_error("Init", "Failed");
 
     for (argv[2..]) |p| {
-        for (p) |c| _ = console_input(&u, c);
-        _ = console_input(&u, '\n');
+        for (p) |c| try console_input(&u, c);
+        try console_input(&u, '\n');
     }
     const stdin = std.io.getStdIn().reader();
     while (u.dev[0x0f] == 0) {
         if (stdin.readByte()) |c|
-            _ = console_input(&u, c)
+            try console_input(&u, c)
         else |err| switch (err) {
             error.EndOfStream => {},
             else => return err,
@@ -112,7 +112,7 @@ fn emu_error(msg: []const u8, err: []const u8) void {
 // 	d[0x02] = c;
 // 	return uxn_eval(u, GETVEC(d));
 // }
-fn console_input(u: *Uxn, c: u8) c_int {
+fn console_input(u: *Uxn, c: u8) !void {
     var d = u.dev + 0x10;
     d[0x02] = c;
     return uxn_eval(u, GETVEC(d));

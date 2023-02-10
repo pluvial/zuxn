@@ -61,7 +61,7 @@ fn system_inspect(u: *Uxn) void {
 // 	}
 // 	return 0;
 // }
-pub fn uxn_halt(u: *Uxn, instr: u8, err: u8, addr: u16) c_int {
+pub fn uxn_halt(u: *Uxn, instr: u8, err: u8, addr: u16) !void {
     const d = u.dev + 0x00;
     const handler = GETVEC(d);
     if (handler > 0) {
@@ -75,7 +75,6 @@ pub fn uxn_halt(u: *Uxn, instr: u8, err: u8, addr: u16) c_int {
         system_inspect(u);
         std.debug.print("{s} {s}, by {} at {}.\n", .{ if (instr & 0x40 > 0) "Return-stack" else "Working-stack", errors[err - 1], instr, addr });
     }
-    return 0;
 }
 
 // /* IO */
