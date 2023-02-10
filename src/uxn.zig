@@ -60,7 +60,8 @@ pub fn HALT(c: u8, u: *Uxn, instr: u8, pc: u16) !void {
 }
 // #define JUMP(x) { if(bs) pc = (x); else pc += (Sint8)(x); }
 pub fn JUMP(x: u16, bs: u16, pc: *u16) void {
-    if (bs > 0) pc.* = x else pc.* += @intCast(u16, @intCast(i8, x));
+    // TODO: revisit this
+    if (bs > 0) pc.* = x else pc.* = @intCast(u16, @intCast(i32, pc.*) + @intCast(i32, @bitCast(i8, @truncate(u8, x))));
 }
 // #define PUSH8(s, x) { if(s->ptr == 0xff) HALT(2) s->dat[s->ptr++] = (x); }
 pub fn PUSH8(s: *Stack, x: u8, u: *Uxn, instr: u8, pc: u16) !void {
@@ -136,7 +137,7 @@ pub fn DEVR(o: *u16, x: u8, u: *Uxn, bs: u16) void {
 pub fn DEVW(x: u8, y: u16, u: *Uxn, bs: u16) void {
     if (bs > 0) {
         u.deo(u, x, @intCast(u8, y >> 8));
-        u.deo(u, x + 1, @intCast(u8, y));
+        u.deo(u, x + 1, @intCast(u8, y & 0xff));
     } else {
         u.deo(u, x, @intCast(u8, y));
     }
