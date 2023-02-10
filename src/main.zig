@@ -59,15 +59,18 @@ pub fn main() !void {
     const argv = args_list.items;
     const argc = args_list.items.len;
 
+    if (argc < 2) return emu_error("Usage", "zuxn game.rom args");
+
     // debug logging;
     for (argv) |arg| {
         std.debug.print("{s} ", .{arg});
     }
     std.debug.print("\n", .{});
 
-    if (argc < 2) return emu_error("Usage", "zuxn game.rom args");
     const ram = try allocator.alloc(u8, 0x10300);
     defer allocator.free(ram);
+    std.mem.set(u8, ram, 0);
+
     var u: Uxn = undefined;
     uxn_boot(&u, ram, emu_dei, emu_deo);
 

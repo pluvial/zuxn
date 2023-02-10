@@ -63,22 +63,26 @@ pub fn JUMP(x: u16, bs: u16, pc: *u16) void {
     if (bs > 0) pc.* = x else pc.* += @intCast(i8, x);
 }
 // #define PUSH8(s, x) { if(s->ptr == 0xff) HALT(2) s->dat[s->ptr++] = (x); }
-pub fn PUSH8(s: *Stack, x: u8, u: *Uxn, instr: u8, pc: u16) c_int {
+pub fn PUSH8(s: *Stack, x: u8, u: *Uxn, instr: u8, pc: u16) ?c_int {
     if (s.ptr == 0xff) return HALT(2, u, instr, pc);
     s.dat[s.ptr] = x;
     s.ptr += 1;
+    // TODO: revisit
+    return null;
 }
 // #define PUSH16(s, x) { if((j = s->ptr) >= 0xfe) HALT(2) k = (x); s->dat[j] = k >> 8; s->dat[j + 1] = k; s->ptr = j + 2; }
-pub fn PUSH16(s: *Stack, x: u8, j: *u16, k: *u16, u: *Uxn, instr: u8, pc: u16) c_int {
+pub fn PUSH16(s: *Stack, x: u16, j: *u16, k: *u16, u: *Uxn, instr: u8, pc: u16) ?c_int {
     j.* = s.ptr;
     if (j.* >= 0xfe) return HALT(2, u, instr, pc);
     k.* = x;
-    s.dat[j.*] = x >> 8;
-    s.dat[j.* + 1] = x;
-    s.ptr = j.* + 2;
+    s.dat[j.*] = @intCast(u8, x >> 8);
+    s.dat[j.* + 1] = @intCast(u8, x & 0xff);
+    s.ptr = @intCast(u8, j.* + 2);
+    // TODO: revisit
+    return null;
 }
 // #define PUSH(s, x) { if(bs) { PUSH16(s, (x)) } else { PUSH8(s, (x)) } }
-pub fn PUSH(s: *Stack, x: u8, j: *u16, k: *u16, u: *Uxn, instr: u8, pc: u16, bs: u16) c_int {
+pub fn PUSH(s: *Stack, x: u8, j: *u16, k: *u16, u: *Uxn, instr: u8, pc: u16, bs: u16) ?c_int {
     if (bs > 0)
         return PUSH16(s, x, j, k, u, instr, pc)
     else
@@ -121,7 +125,7 @@ pub fn POKE(x: u16, y: u16, u: *Uxn, bs: u16) void {
 }
 // #define PEEK16(o, x) { o = (u->ram[(x)] << 8) + u->ram[(x) + 1]; }
 pub fn PEEK16(o: *u16, x: u16, u: *Uxn) void {
-    o.* = (u.ram[x] << 8) + u.ram[x + 1];
+    o.* = (@intCast(u16, u.ram[x]) << 8) + u.ram[x + 1];
 }
 // #define PEEK(o, x) { if(bs) PEEK16(o, x) else o = u->ram[(x)]; }
 pub fn PEEK(o: *u16, x: u16, u: *Uxn, bs: u16) void {
@@ -213,11 +217,11 @@ pub fn uxn_eval(u: *Uxn, pc_: u16) c_int {
     var pc = pc_;
     var kptr: u8 = undefined;
     var sp: *u8 = undefined;
-    // var a: u16 = undefined;
+    var a: u16 = undefined;
     var b: u16 = undefined;
     // var c: u16 = undefined;
     var j: u16 = undefined;
-    // var k: u16 = undefined;
+    var k: u16 = undefined;
     var bs: u16 = undefined;
     var instr: u16 = undefined;
     var opcode: u16 = undefined;
@@ -243,7 +247,10 @@ pub fn uxn_eval(u: *Uxn, pc_: u16) c_int {
         // Short Mode
         bs = instr & 0x20;
         opcode = instr & 0x1f;
-        switch (@intCast(i32, opcode - (@boolToInt(opcode == 0) * (instr >> 5)))) {
+        const sw = @intCast(i32, opcode) - (@boolToInt(opcode == 0) * (instr >> 5));
+        // debug logging
+        std.debug.print("instr: {}, pc: {}, bs: {}, opcode: {}, sw: {}\n", .{ instr, pc, bs, opcode, sw });
+        switch (sw) {
             // Literals/Calls
             -0x0 => return 1, // BRK
             -0x1 => { // JCI
@@ -252,16 +259,27 @@ pub fn uxn_eval(u: *Uxn, pc_: u16) c_int {
                     pc += 2;
                 }
             },
+            -0x2 => { // JMI
+                PEEK16(&a, pc, u);
+                pc += a + 2;
+            },
+            -0x3 => { // JSI
+                if (PUSH16(u.rst, pc + 2, &j, &k, u, @intCast(u8, instr), pc)) |err| return err;
+                PEEK16(&a, pc, u);
+                pc += a + 2;
+            },
+            -0x4, -0x6 => { // LIT, LITr
+                a = u.ram[pc];
+                pc += 1;
+                if (PUSH8(src, @intCast(u8, a), u, @intCast(u8, instr), pc)) |err| return err;
+            },
+            -0x5, -0x7 => { // LIT2, LIT2r
+                PEEK16(&a, pc, u);
+                if (PUSH16(src, a, &j, &k, u, @intCast(u8, instr), pc)) |err| return err;
+                pc += 2;
+            },
             // TODO: revisit
             else => unreachable,
-            // 		case -0x0: /* BRK */ return 1;
-            // 		case -0x1: /* JCI */ POP8(b) if(!b) { pc += 2; break; }
-            // 		case -0x2: /* JMI */ PEEK16(a, pc) pc += a + 2; break;
-            // 		case -0x3: /* JSI */ PUSH16(u->rst, pc + 2) PEEK16(a, pc) pc += a + 2; break;
-            // 		case -0x4: /* LIT */
-            // 		case -0x6: /* LITr */ a = u->ram[pc++]; PUSH8(src, a) break;
-            // 		case -0x5: /* LIT2 */
-            // 		case -0x7: /* LIT2r */ PEEK16(a, pc) PUSH16(src, a) pc += 2; break;
             // 		/* ALU */
             // 		case 0x01: /* INC */ POP(a) PUSH(src, a + 1) break;
             // 		case 0x02: /* POP */ POP(a) break;
